@@ -30,3 +30,12 @@
 *.exe
 *.out
 *.app
+
+# msvc temp files
+*.pdb
+*.obj
+*.ilk
+
+# vim files
+*.swp
+*.swo
