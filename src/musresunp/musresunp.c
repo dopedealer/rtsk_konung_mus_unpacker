@@ -1,6 +1,8 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+
 
 #include "musresunp.h"
 
@@ -13,7 +15,8 @@ void printShortInfo(void);
 int searchAndExtract(void);
 long int getFileSize(FILE * fp);
 int readFileAndUnpack(FILE * fpSrc, char * pool, long int poolSize);
-void printErrorOccured(int err);
+void printRetCode(int err);
+int writeToNewFile(char * buffer, uint32_t size, int index);
 
 int
 main(int argc, char ** argv)
@@ -21,10 +24,7 @@ main(int argc, char ** argv)
     int err;
     printShortInfo();
     err = searchAndExtract();
-    if (err)
-    {
-        printErrorOccured(err);
-    }
+    printRetCode(err);
 
     return 0;
 }
@@ -99,12 +99,14 @@ getFileSize(FILE * fp)
 int
 readFileAndUnpack(FILE * fpSrc, char * pool, long int poolSize)
 {
-    int err = KNG_RESUNP_ERR_UNKNOWN;
+    int err = KNG_RESUNP_SUCCESS;
     size_t frc;
     struct rtsc_resfile_startdesc startDescr;
     struct rtsc_musres_descr musfileDescr;
     long int baseDescPos, baseFilePos;
     int cnt;
+    int rc;
+    FILE * fpOut = 0x0;
 
     frc = fread(&startDescr, 1, sizeof(struct rtsc_resfile_startdesc), fpSrc);
     if (frc < sizeof(struct rtsc_resfile_startdesc))
@@ -120,20 +122,47 @@ readFileAndUnpack(FILE * fpSrc, char * pool, long int poolSize)
         return err;
     }
     baseFilePos = baseDescPos + (KNG_MUSRES_MAXSONGS * sizeof(struct rtsc_musres_descr));
-    printf("size of first bytes: %u\n", frc);
-    /*printf("size 0x%08x, %u\n", fileSz, fileSz);*/
-    // {UNPACK AND WRITE TO FILES}
-    // {FREE MEM}
+
+    for (cnt = 0; cnt < KNG_MUSRES_MAXSONGS; cnt++)
+    {
+        rc = fseek(fpSrc, baseDescPos + cnt*(sizeof(struct rtsc_musres_descr)), SEEK_SET);
+        if (rc != 0) {
+            err = KNG_RESUNP_ERR_UEOF;
+            break;
+        }
+        frc = fread(&musfileDescr, 1, sizeof(struct rtsc_musres_descr), fpSrc);
+        if (frc < sizeof(struct rtsc_resfile_startdesc)) {
+            err = KNG_RESUNP_ERR_UEOF;
+            break;
+        }
+        rc = fseek(fpSrc, baseFilePos + musfileDescr.offset, SEEK_SET);
+        if (rc != 0) {
+            err = KNG_RESUNP_ERR_UEOF;
+            break;
+        }
+        frc = fread(pool, 1, musfileDescr.size, fpSrc);
+        if (frc < musfileDescr.size) {
+            err = KNG_RESUNP_ERR_UEOF;
+            break;
+        }
+        err = writeToNewFile(pool, musfileDescr.size, cnt);
+        if (err != 0) {
+            break;
+        } 
+    }
 
     return err;
 }
 
 void
-printErrorOccured(int err)
+printRetCode(int err)
 {
     char * desc = 0x0;
     if (err == KNG_RESUNP_SUCCESS)
+    {
+        printf("done.\n");
         return;
+    }
 
     printf("Extraction failed!\n");
     switch (err)
@@ -152,4 +181,31 @@ printErrorOccured(int err)
             break;
     }
     printf("Error: %s\n", desc);
+}
+
+int
+writeToNewFile(char * buffer, uint32_t size, int index)
+{
+    int rc = 0;
+    size_t frc = 0;
+    FILE * fp;
+    enum {namebuf_size = 32};
+    char name[namebuf_size];
+    memset(name, 0x0, namebuf_size);
+
+    snprintf(name, namebuf_size, "%04d%s", index, ".ogg"); 
+    fp = fopen(name, "wb");
+    if (fp == 0x0) {
+        return KNG_RESUNP_ERR_FWRITE;
+    }
+    frc = fwrite(buffer, 1, size, fp);
+    if (frc < size) {
+        rc = KNG_RESUNP_ERR_FWRITE; 
+    } else {
+        rc = KNG_RESUNP_SUCCESS;
+    }
+
+    fclose(fp);
+
+    return rc;
 }
