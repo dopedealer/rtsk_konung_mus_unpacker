@@ -48,20 +48,17 @@ int searchAndExtract(void)
     do 
     {
         fp = fopen(KNG_MUSRES_FILENAME, "rb");
-        if (fp == 0x0)
-        {
+        if (fp == 0x0) {
             err =  KNG_RESUNP_ERR_NOFILE;
             break;
         }
 
         fileSz = getFileSize(fp);
         pool = malloc(fileSz);
-        if (pool == 0x0)
-        {
+        if (pool == 0x0) {
             err = KNG_RESUNP_ERR_MALLOC;
             break;
-        }
-
+        } 
         err = readFileAndUnpack(fp, pool, fileSz);
     } while (0); 
 
@@ -107,6 +104,7 @@ readFileAndUnpack(FILE * fpSrc, char * pool, long int poolSize)
     int cnt;
     int rc;
     FILE * fpOut = 0x0;
+    uint32_t sizeOfBlock;
 
     frc = fread(&startDescr, 1, sizeof(struct rtsc_resfile_startdesc), fpSrc);
     if (frc < sizeof(struct rtsc_resfile_startdesc))
@@ -140,12 +138,13 @@ readFileAndUnpack(FILE * fpSrc, char * pool, long int poolSize)
             err = KNG_RESUNP_ERR_UEOF;
             break;
         }
-        frc = fread(pool, 1, musfileDescr.size, fpSrc);
+        sizeOfBlock = VAL_MIN(musfileDescr.size, (uint32_t)poolSize);
+        frc = fread(pool, 1, sizeOfBlock, fpSrc);
         if (frc < musfileDescr.size) {
             err = KNG_RESUNP_ERR_UEOF;
             break;
         }
-        err = writeToNewFile(pool, musfileDescr.size, cnt);
+        err = writeToNewFile(pool, sizeOfBlock, cnt);
         if (err != 0) {
             break;
         } 

@@ -16,16 +16,19 @@
 
 #define KNG_RESUNP_ERR_UNKNOWN -1
 
+#define VAL_MIN(_A, _B) (((_A) < (_B)) ? (_A) : (_B))
+
 struct rtsc_resfile_startdesc
 {
-    uint32_t field0;
-    uint32_t size;
+    uint32_t field0;    // ??
+    uint32_t size;      // size of 'content' data. Not includes descriptor size and
+                        // structures before this 'content' data
 };
 
 struct rtsc_musres_descr
 {
-    uint32_t offset;
-    uint32_t size;
+    uint32_t offset;    // offset of entry from base of data
+    uint32_t size;      // size of data entry
 };
 
 #endif // _TESTAPP_H
